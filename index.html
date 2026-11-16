@@ -63,6 +63,7 @@
     const r=(.25+(1-y/5.7)*1.48)*rand(.83,1.02);
     baubles.push({x:Math.cos(a)*r,y,z:Math.sin(a)*r,h:i%2,phase:rand(0,6.28)});
   }
+  const orbitSparkles=Array.from({length:48},(_,i)=>({y:rand(.38,5.38),angle:rand(0,6.28),radius:rand(.72,1.08),size:rand(.8,1.9),phase:rand(0,6.28),color:i%3===0?'#ffd589':'#bceaff'}));
   function makeSnowGrid(columns,rows,minSize,maxSize,minSpeed,maxSpeed,minAlpha,maxAlpha){
     const flakes=[];
     for(let row=0;row<rows;row++)for(let col=0;col<columns;col++){
@@ -72,10 +73,10 @@
     }
     return flakes;
   }
-  const snow=makeSnowGrid(15,20,.85,1.75,.00055,.0012,.34,.72);
-  const frontSnow=makeSnowGrid(8,14,2.2,4.4,.0011,.0021,.35,.72);
+  const snow=makeSnowGrid(16,22,1.05,2.25,.0007,.00145,.42,.84);
+  const frontSnow=makeSnowGrid(10,16,3.0,5.4,.00125,.0025,.45,.86);
   let rotation=-.35, targetRotation=-.35, tilt=0, targetTilt=0;
-  let dragging=false, lastX=0, lastY=0;
+  let dragging=false, lastX=0, lastY=0, lastFrameTime=0;
   let clickStart=null, hotpotDrop=null, giftHitAreas=[], pointerX=-1, pointerY=-1, giftHoverIndex=-1;
 
   const potParticles=[];
@@ -147,9 +148,9 @@
   canvas.addEventListener('pointermove',e=>{
     pointerX=e.clientX;pointerY=e.clientY;
     if(!dragging)return;
-    targetRotation+=(e.clientX-lastX)*.012;
-    targetTilt+=(e.clientY-lastY)*.008;
-    targetTilt=Math.max(-.48,Math.min(.48,targetTilt));
+    targetRotation+=(e.clientX-lastX)*.017;
+    targetTilt+=(e.clientY-lastY)*.0095;
+    targetTilt=Math.max(-.62,Math.min(.62,targetTilt));
     lastX=e.clientX; lastY=e.clientY;
   });
   const stopDrag=()=>{dragging=false;canvas.style.cursor=giftHitAreas.some(a=>pointerX>=a.x&&pointerX<=a.x+a.width&&pointerY>=a.y&&pointerY<=a.y+a.height)?'pointer':'grab';};
@@ -158,7 +159,7 @@
   canvas.style.cursor='grab';
 
   function project(p,time,scale,centerX,centerY,rot,tilt) {
-    const sway=Math.sin(time*.00038)*.035;
+    const sway=Math.sin(time*.00038)*.06;
     const x=p.x*Math.cos(rot)+p.z*Math.sin(rot), z=-p.x*Math.sin(rot)+p.z*Math.cos(rot);
     const yy=p.y*Math.cos(tilt)-z*Math.sin(tilt);
     const zz=p.y*Math.sin(tilt)+z*Math.cos(tilt);
@@ -190,9 +191,10 @@
       if(f.y>1.04)f.y=-.04;
       const sway=Math.sin(time*.00042+f.phase)*f.sway+Math.sin(time*.00011)*.012;
       const x=((f.baseX+sway+1)%1)*w,y=f.y*h,r=f.r*(.82+f.y*.35),a=f.alpha*(.78+.22*Math.sin(time*.001+f.phase));
-      glowDot(x,y,r*.48,f.color,a,8);
-      ctx.save();ctx.translate(x,y);ctx.rotate(time*f.spin+f.phase);ctx.globalAlpha=a*.74;ctx.strokeStyle=f.color;ctx.lineWidth=.72;
+      glowDot(x,y,r*.55,f.color,a,11);
+      ctx.save();ctx.translate(x,y);ctx.rotate(time*f.spin+f.phase);ctx.globalAlpha=a*.84;ctx.strokeStyle=f.color;ctx.lineWidth=.95;
       for(let k=0;k<6;k++){ctx.rotate(Math.PI/3);ctx.beginPath();ctx.moveTo(0,-r*.12);ctx.lineTo(0,-r*1.5);ctx.moveTo(0,-r*.82);ctx.lineTo(-r*.32,-r*1.1);ctx.moveTo(0,-r*.82);ctx.lineTo(r*.32,-r*1.1);ctx.stroke();}
+      if(f.v>.002){ctx.globalAlpha=a*.24;ctx.beginPath();ctx.moveTo(0,r*.45);ctx.lineTo(0,r*2.1);ctx.stroke();}
       ctx.restore();
     }
   }
@@ -226,7 +228,8 @@
   function frame(now){
     raf=requestAnimationFrame(frame);
     const time=now||0;
-    if(!dragging)targetRotation+=.00018;
+    const frameFactor=lastFrameTime?Math.min(2.5,(time-lastFrameTime)/16.667):1;lastFrameTime=time;
+    if(!dragging)targetRotation+=.0013*frameFactor;
     rotation+=(targetRotation-rotation)*.045;
     tilt+=(targetTilt-tilt)*.07;
     drawBackdrop();
@@ -237,7 +240,7 @@
       const sway=Math.sin(time*.00037+f.phase)*f.sway+Math.sin(time*.0001)*.01;
       const x=((f.baseX+sway+1)%1)*w,y=f.y*h,r=f.r*(.8+f.y*.55),alpha=f.alpha*(.75+.25*Math.sin(time*.001+f.phase));
       glowDot(x,y,r,f.color,alpha, r>1.8?8:3);
-      ctx.save();ctx.translate(x,y);ctx.rotate(time*f.spin+f.phase);ctx.globalAlpha=alpha*.55;ctx.strokeStyle=f.color;ctx.lineWidth=.55;ctx.beginPath();
+      ctx.save();ctx.translate(x,y);ctx.rotate(time*f.spin+f.phase);ctx.globalAlpha=alpha*.76;ctx.strokeStyle=f.color;ctx.lineWidth=.78;ctx.beginPath();
       for(let k=0;k<6;k++){ctx.rotate(Math.PI/3);ctx.moveTo(0,0);ctx.lineTo(0,-r*1.8);ctx.moveTo(0,-r*1.05);ctx.lineTo(-r*.28,-r*1.3);ctx.moveTo(0,-r*1.05);ctx.lineTo(r*.28,-r*1.3);}
       ctx.stroke();ctx.restore();
     }
@@ -259,6 +262,12 @@
     }
     for(const b of baubles){const q=project(b,time,scale,cx,cy,rotation,tilt), c=b.h?'#b9e8e0':'#f4d28e';
       glowDot(q.x,q.y,4.2*q.perspective,c,.98,16);glowDot(q.x-1,q.y-1,1.25,'#fff8e9',.95,3);
+    }
+    for(const s of orbitSparkles){
+      const a=s.angle+time*.00022*(s.y%2?1:-1), t=s.y/5.7, r=s.radius*(.34+(1-t)*1.5);
+      const q=project({x:Math.cos(a)*r,y:s.y,z:Math.sin(a)*r},time,scale,cx,cy,rotation,tilt);
+      const twinkle=.3+.7*(.5+.5*Math.sin(time*.003+s.phase));
+      glowDot(q.x,q.y,s.size*q.perspective,s.color,twinkle,10);
     }
     // Small wrapped presents on the snowy ground.
     const ground=cy+scale*2.92;
