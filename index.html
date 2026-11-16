@@ -12,13 +12,14 @@
   body { font-family: Georgia, "Times New Roman", serif; color:#e9f2ff; }
   #scene { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
   .vignette { position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at 58% 48%, transparent 46%, rgba(0,0,0,.32) 100%); }
-  .copy { position:fixed; left:clamp(28px,9vw,150px); top:50%; transform:translateY(-50%); z-index:2; pointer-events:none; }
+  .copy { position:fixed; left:clamp(28px,9vw,150px); top:50%; transform:translateY(-50%); z-index:2; pointer-events:none; animation:copy-in 1.25s cubic-bezier(.2,.8,.2,1) both; }
   h1 { position:relative; display:inline-block; margin:0; font-family:"Palatino Linotype","Book Antiqua",Georgia,serif; font-size:clamp(50px,7vw,96px); line-height:1.04; font-weight:400; font-style:italic; letter-spacing:-.045em; color:#83c8ff; text-shadow:0 0 26px rgba(74,163,255,.22); transform-origin:left center; pointer-events:auto; transition:transform .55s cubic-bezier(.2,.8,.2,1), color .45s ease, text-shadow .45s ease; }
   h1::after { content:""; position:absolute; left:2px; right:8%; bottom:-13px; height:1px; background:linear-gradient(90deg,rgba(116,198,255,.8),rgba(116,198,255,0)); transform:scaleX(0); transform-origin:left; transition:transform .55s cubic-bezier(.2,.8,.2,1); }
   h1:hover { transform:translateY(-5px) scale(1.035); color:#d9f2ff; text-shadow:0 0 18px rgba(90,183,255,.48),0 0 48px rgba(69,145,255,.24); }
   h1:hover::after { transform:scaleX(1); }
   h1 span { display:block; margin-top:14px; font-size:.48em; letter-spacing:.01em; color:#edf5ff; text-shadow:0 0 18px rgba(199,228,255,.16); white-space:nowrap; transition:color .45s ease,text-shadow .45s ease; }
   h1:hover span { color:#a8dcff; text-shadow:0 0 22px rgba(100,188,255,.44); }
+  @keyframes copy-in { from { opacity:0; filter:blur(7px); } to { opacity:1; filter:blur(0); } }
   @media (max-width:700px) {
     .copy { left:26px; top:12%; transform:none; }
     h1 { font-size:clamp(42px,12vw,68px); }
@@ -48,14 +49,14 @@
     const branchEdge=tierBase*(.84 + .16*Math.sin(local*Math.PI));
     const r=Math.sqrt(random())*branchEdge;
     const a=random()*Math.PI*2;
-    tree.push({x:Math.cos(a)*r, y, z:Math.sin(a)*r, size:rand(.62,1.45), hue:random(), phase:rand(0,6.28)});
+    tree.push({x:Math.cos(a)*r, y, z:Math.sin(a)*r, size:rand(.62,1.45), hue:random(), phase:rand(0,6.28),introAngle:rand(0,6.28),introSpread:rand(.35,2.5),introDelay:random()});
   }
   // A luminous spiral garland winding all the way from the crown to the foot.
   const garland=[];
   for(let i=0;i<1750;i++) {
     const t=i/1749, y=.12+t*5.68, a=t*Math.PI*2*9.3;
     const r=.18+(1-t)*1.68;
-    garland.push({x:Math.cos(a)*r,y,z:Math.sin(a)*r,size:rand(.8,2.0),phase:rand(0,6.28)});
+    garland.push({x:Math.cos(a)*r,y,z:Math.sin(a)*r,size:rand(.8,2.0),phase:rand(0,6.28),introAngle:rand(0,6.28),introSpread:rand(.3,1.9),introDelay:random()});
   }
   const baubles=[];
   for(let i=0;i<52;i++) {
@@ -63,7 +64,7 @@
     const r=(.25+(1-y/5.7)*1.48)*rand(.83,1.02);
     baubles.push({x:Math.cos(a)*r,y,z:Math.sin(a)*r,h:i%2,phase:rand(0,6.28)});
   }
-  const orbitSparkles=Array.from({length:48},(_,i)=>({y:rand(.38,5.38),angle:rand(0,6.28),radius:rand(.72,1.08),size:rand(.8,1.9),phase:rand(0,6.28),color:i%3===0?'#ffd589':'#bceaff'}));
+  const orbitSparkles=Array.from({length:48},()=>({y:rand(.38,5.38),angle:rand(0,6.28),radius:rand(.72,1.08),size:rand(.8,1.9),phase:rand(0,6.28),color:random()<.5?'#64c0ff':'#c7edff'}));
   function makeSnowGrid(columns,rows,minSize,maxSize,minSpeed,maxSpeed,minAlpha,maxAlpha){
     const flakes=[];
     for(let row=0;row<rows;row++)for(let col=0;col<columns;col++){
@@ -167,6 +168,11 @@
     const camera=8.6, perspective=camera/(camera+zz*.68);
     return {x:centerX+xx*scale*perspective,y:centerY-(yy-2.85)*scale*perspective,z, perspective};
   }
+  function entrancePosition(p,time){
+    const u=Math.max(0,Math.min(1,(time-p.introDelay*620)/1850));
+    const eased=u*u*(3-2*u), remain=1-eased, angle=p.introAngle+remain*3.8;
+    return {x:p.x+Math.cos(angle)*p.introSpread*remain,y:p.y+remain*(.5+Math.sin(p.phase+time*.0015)*.16),z:p.z+Math.sin(angle)*p.introSpread*remain,alpha:.1+.9*eased};
+  }
   function glowDot(x,y,r,color,alpha=1,blur=8){
     ctx.globalAlpha=alpha; ctx.shadowColor=color; ctx.shadowBlur=blur; ctx.fillStyle=color;
     ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
@@ -248,33 +254,34 @@
     const cx=compact?w*.57:w*.68, cy=h*(compact?.62:.57);
     // Ground halo and a subtle reflection beneath the tree.
     ctx.save();ctx.translate(cx,cy+scale*2.95);ctx.scale(1,.22);
-    const halo=ctx.createRadialGradient(0,0,scale*.1,0,0,scale*2.2);halo.addColorStop(0,'rgba(83,196,139,.28)');halo.addColorStop(.45,'rgba(218,173,96,.12)');halo.addColorStop(1,'rgba(18,46,100,0)');
+    const halo=ctx.createRadialGradient(0,0,scale*.1,0,0,scale*2.2);halo.addColorStop(0,'rgba(69,168,255,.32)');halo.addColorStop(.45,'rgba(43,113,226,.15)');halo.addColorStop(1,'rgba(18,46,100,0)');
     ctx.fillStyle=halo;ctx.beginPath();ctx.arc(0,0,scale*2.2,0,Math.PI*2);ctx.fill();ctx.restore();
     // Draw back-to-front for a convincing volumetric point cloud.
+    const sceneReveal=Math.min(1,time/1850);
     const points=[];
-    for(const p of tree){const q=project(p,time,scale,cx,cy,rotation,tilt);points.push({...q,type:0,p});}
-    for(const p of garland){const q=project(p,time,scale,cx,cy,rotation,tilt);points.push({...q,type:1,p});}
+    for(const p of tree){const start=entrancePosition(p,time),q=project(start,time,scale,cx,cy,rotation,tilt);points.push({...q,type:0,p,entranceAlpha:start.alpha});}
+    for(const p of garland){const start=entrancePosition(p,time),q=project(start,time,scale,cx,cy,rotation,tilt);points.push({...q,type:1,p,entranceAlpha:start.alpha});}
     points.sort((a,b)=>a.z-b.z);
     for(const q of points){
       const flicker=.55+.45*Math.sin(time*.002+q.p.phase), size=q.p.size*q.perspective*(q.type?1.08:1);
-      if(q.type){glowDot(q.x,q.y,size,'#ffd589',flicker*.94,10);}
-      else {const hue=138+q.p.hue*14, light=44+q.p.hue*11;glowDot(q.x,q.y,size,`hsl(${hue} 76% ${light}%)`,.66+flicker*.26,4);}
+      if(q.type){glowDot(q.x,q.y,size,q.p.hue>.5?'#73caff':'#c3edff',flicker*.88*q.entranceAlpha,10);}
+      else {const hue=199+q.p.hue*17, light=42+q.p.hue*17;glowDot(q.x,q.y,size,`hsl(${hue} 84% ${light}%)`,(.64+flicker*.3)*q.entranceAlpha,5);}
     }
-    for(const b of baubles){const q=project(b,time,scale,cx,cy,rotation,tilt), c=b.h?'#b9e8e0':'#f4d28e';
-      glowDot(q.x,q.y,4.2*q.perspective,c,.98,16);glowDot(q.x-1,q.y-1,1.25,'#fff8e9',.95,3);
+    for(const b of baubles){const q=project(b,time,scale,cx,cy,rotation,tilt), c=b.h?'#77caff':'#d8f3ff';
+      glowDot(q.x,q.y,4.2*q.perspective,c,.98*sceneReveal,16);glowDot(q.x-1,q.y-1,1.25,'#f4fbff',.95*sceneReveal,3);
     }
     for(const s of orbitSparkles){
       const a=s.angle+time*.00022*(s.y%2?1:-1), t=s.y/5.7, r=s.radius*(.34+(1-t)*1.5);
       const q=project({x:Math.cos(a)*r,y:s.y,z:Math.sin(a)*r},time,scale,cx,cy,rotation,tilt);
       const twinkle=.3+.7*(.5+.5*Math.sin(time*.003+s.phase));
-      glowDot(q.x,q.y,s.size*q.perspective,s.color,twinkle,10);
+      glowDot(q.x,q.y,s.size*q.perspective,s.color,twinkle*sceneReveal,10);
     }
     // Small wrapped presents on the snowy ground.
     const ground=cy+scale*2.92;
     const gifts=[
-      {x:cx-scale*1.78,base:ground,width:scale*.42,height:scale*.38,color:'#9d3b53',ribbon:'#f2d18d'},
+      {x:cx-scale*1.78,base:ground,width:scale*.42,height:scale*.38,color:'#245c9b',ribbon:'#b8e3ff'},
       {x:cx-scale*1.34,base:ground-scale*.02,width:scale*.32,height:scale*.29,color:'#315f8d',ribbon:'#d7f0ea'},
-      {x:cx+scale*1.38,base:ground,width:scale*.46,height:scale*.41,color:'#8d3850',ribbon:'#bfe6df'}
+      {x:cx+scale*1.38,base:ground,width:scale*.46,height:scale*.41,color:'#2878b6',ribbon:'#c7ecff'}
     ];
     giftHitAreas=gifts.map(g=>({x:g.x-scale*.035,y:g.base-g.height-scale*.12,width:g.width+scale*.07,height:g.height+scale*.18}));
     giftHoverIndex=giftHitAreas.findIndex(a=>pointerX>=a.x&&pointerX<=a.x+a.width&&pointerY>=a.y&&pointerY<=a.y+a.height);
@@ -283,9 +290,9 @@
     // Star topper with long, fine rays.
     const top=project({x:0,y:5.95,z:0},time,scale,cx,cy,rotation,tilt), pulse=.78+.22*Math.sin(time*.003);
     ctx.save();ctx.translate(top.x,top.y);ctx.rotate(time*.00022);
-    ctx.globalAlpha=.9;ctx.strokeStyle='#ffe8ad';ctx.lineWidth=1.4;ctx.shadowColor='#ffcb70';ctx.shadowBlur=26;
+    ctx.globalAlpha=.9*sceneReveal;ctx.strokeStyle='#bceaff';ctx.lineWidth=1.5;ctx.shadowColor='#55baff';ctx.shadowBlur=28;
     for(let i=0;i<8;i++){ctx.rotate(Math.PI/4);ctx.beginPath();ctx.moveTo(0,-2);ctx.lineTo(0,-14*pulse);ctx.stroke();}
-    ctx.fillStyle='#fff9e9';ctx.beginPath();ctx.arc(0,0,5.2*pulse,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.fillStyle='#f3fbff';ctx.beginPath();ctx.arc(0,0,5.4*pulse,0,Math.PI*2);ctx.fill();ctx.restore();
     ctx.globalAlpha=1;
     drawHotpot(time);
     drawForegroundSnow(time);
