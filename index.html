@@ -19,10 +19,16 @@
   h1:hover::after { transform:scaleX(1); }
   h1 span { display:block; margin-top:14px; font-size:.48em; letter-spacing:.01em; color:#edf5ff; text-shadow:0 0 18px rgba(199,228,255,.16); white-space:nowrap; transition:color .45s ease,text-shadow .45s ease; }
   h1:hover span { color:#a8dcff; text-shadow:0 0 22px rgba(100,188,255,.44); }
+  #hotpotButton { position:fixed; z-index:4; left:68%; top:94%; transform:translate(-50%,-50%); width:68px; height:68px; display:grid; place-items:center; border:1px solid rgba(255,225,239,.82); border-radius:50%; color:#fff6fb; background:radial-gradient(circle at 32% 24%,#ffb7d3,#c83c79 52%,#591d50 100%); box-shadow:0 0 18px rgba(255,105,169,.38),inset 0 1px 5px rgba(255,255,255,.55); cursor:pointer; transition:transform .25s ease,box-shadow .25s ease; animation:button-in 1s 1.4s both; }
+  #hotpotButton:hover { transform:translate(-50%,-50%) scale(1.12); box-shadow:0 0 30px rgba(255,121,186,.75),inset 0 1px 5px rgba(255,255,255,.7); }
+  #hotpotButton:active { transform:translate(-50%,-50%) scale(.93); }
+  #hotpotButton svg { width:36px;height:36px; filter:drop-shadow(0 1px 2px rgba(42,5,24,.45)); }
+  @keyframes button-in { from {opacity:0;scale:.6} to {opacity:1;scale:1} }
   @keyframes copy-in { from { opacity:0; filter:blur(7px); } to { opacity:1; filter:blur(0); } }
   @media (max-width:700px) {
-    .copy { left:26px; top:12%; transform:none; }
+    .copy { left:22px; top:6%; transform:none; }
     h1 { font-size:clamp(42px,12vw,68px); }
+    #hotpotButton { width:60px;height:60px;top:94%; }
   }
 </style>
 </head>
@@ -30,6 +36,7 @@
 <canvas id="scene" aria-label="A glowing three-dimensional particle Christmas tree in falling snow"></canvas>
 <div class="vignette"></div>
 <main class="copy"><h1>for Qiuxia<span>Merry Christmas</span></h1></main>
+<button id="hotpotButton" type="button" aria-label="Drop the hot pot" title="Drop the hot pot"><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M9 20h30l-3 17H12L9 20Z" fill="#fff2f7" stroke="#fff" stroke-width="2"/><path d="M7 19h34M15 16c-2-3 2-4 0-7m9 7c-2-3 2-4 0-7m9 7c-2-3 2-4 0-7" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/><path d="M18 25h12" stroke="#e35b91" stroke-width="2.2" stroke-linecap="round"/><circle cx="17" cy="31" r="1.7" fill="#e35b91"/><circle cx="25" cy="31" r="1.7" fill="#e35b91"/><circle cx="32" cy="29" r="1.7" fill="#e35b91"/></svg></button>
 <script>
 (() => {
   const canvas = document.querySelector('#scene');
@@ -51,6 +58,11 @@
     const a=random()*Math.PI*2;
     tree.push({x:Math.cos(a)*r, y, z:Math.sin(a)*r, size:rand(.62,1.45), hue:random(), phase:rand(0,6.28),introAngle:rand(0,6.28),introSpread:rand(.5,3.0),introDelay:random()});
   }
+  const trunk=[];
+  for(let i=0;i<440;i++){
+    const y=random()*.78, a=random()*Math.PI*2, r=Math.sqrt(random())*.19;
+    trunk.push({x:Math.cos(a)*r,y,z:Math.sin(a)*r,size:rand(.8,1.65),hue:random(),phase:rand(0,6.28),introAngle:rand(0,6.28),introSpread:rand(.35,1.2),introDelay:random()});
+  }
   // A luminous spiral garland winding all the way from the crown to the foot.
   const garland=[];
   for(let i=0;i<1750;i++) {
@@ -64,7 +76,7 @@
     const r=(.25+(1-y/5.7)*1.48)*rand(.83,1.02);
     baubles.push({x:Math.cos(a)*r,y,z:Math.sin(a)*r,h:i%2,phase:rand(0,6.28)});
   }
-  const orbitSparkles=Array.from({length:64},()=>({y:rand(.38,5.38),angle:rand(0,6.28),radius:rand(.72,1.08),size:rand(1.0,2.5),phase:rand(0,6.28),color:random()<.5?'#ffd47a':'#fff1c6'}));
+  const orbitSparkles=Array.from({length:64},()=>({y:rand(.38,5.38),angle:rand(0,6.28),radius:rand(.72,1.08),size:rand(1.0,2.5),phase:rand(0,6.28),color:random()<.5?'#ff9ac4':'#fff3f9'}));
   function makeSnowGrid(columns,rows,minSize,maxSize,minSpeed,maxSpeed,minAlpha,maxAlpha){
     const flakes=[];
     for(let row=0;row<rows;row++)for(let col=0;col<columns;col++){
@@ -78,7 +90,8 @@
   const frontSnow=makeSnowGrid(5,8,3.0,5.4,.00125,.0025,.45,.86);
   let rotation=-.35, targetRotation=-.35, tilt=0, targetTilt=0;
   let dragging=false, lastX=0, lastY=0, lastFrameTime=0;
-  let clickStart=null, hotpotDrop=null, giftHitAreas=[], pointerX=-1, pointerY=-1, giftHoverIndex=-1;
+  let hotpotDrop=null, sceneCx=0;
+  const hotpotButton=document.querySelector('#hotpotButton');
 
   const potParticles=[];
   const potDot=(x,y,color,r=.009,steam=false)=>potParticles.push({x,y,color,r,steam,phase:rand(0,6.28)});
@@ -126,8 +139,9 @@
   function spawnHotpot(clientX){
     const compact=w<700,size=Math.min(w*(compact?.20:.21),h*(compact?.22:.24));
     const margin=size*1.24,x=Math.max(margin,Math.min(w-margin,clientX));
-    hotpotDrop={x,y:-size*1.35,startY:-size*1.35,startedAt:null,duration:420,size,landed:false,landedAt:0,sparks:[],targetY:h*.92-size*.96};
+    hotpotDrop={x,y:-size*1.35,startY:-size*1.35,startedAt:null,duration:360,size,landed:false,landedAt:0,sparks:[],targetY:h*.89-size*.96};
   }
+  hotpotButton.addEventListener('click',()=>spawnHotpot(sceneCx||w*.57));
 
   function resize(){
     dpr=Math.min(devicePixelRatio||1,2); w=innerWidth; h=innerHeight;
@@ -135,27 +149,18 @@
     ctx.setTransform(dpr,0,0,dpr,0,0);
   }
   addEventListener('resize',resize); resize();
-  addEventListener('pointerdown',e=>{clickStart={x:e.clientX,y:e.clientY};});
-  addEventListener('pointerup',e=>{
-    if(!clickStart)return;
-    const moved=Math.hypot(e.clientX-clickStart.x,e.clientY-clickStart.y);
-    if(moved<(e.pointerType==='touch'?20:10)&&giftHitAreas.some(a=>e.clientX>=a.x&&e.clientX<=a.x+a.width&&e.clientY>=a.y&&e.clientY<=a.y+a.height))spawnHotpot(e.clientX);
-    clickStart=null;
-  });
-  addEventListener('pointercancel',()=>clickStart=null);
   canvas.addEventListener('pointerdown',e=>{
     dragging=true; lastX=e.clientX; lastY=e.clientY;
     canvas.setPointerCapture(e.pointerId); canvas.style.cursor='grabbing';
   });
   canvas.addEventListener('pointermove',e=>{
-    pointerX=e.clientX;pointerY=e.clientY;
     if(!dragging)return;
     targetRotation+=(e.clientX-lastX)*.017;
     targetTilt+=(e.clientY-lastY)*.0095;
     targetTilt=Math.max(-.62,Math.min(.62,targetTilt));
     lastX=e.clientX; lastY=e.clientY;
   });
-  const stopDrag=()=>{dragging=false;canvas.style.cursor=giftHitAreas.some(a=>pointerX>=a.x&&pointerX<=a.x+a.width&&pointerY>=a.y&&pointerY<=a.y+a.height)?'pointer':'grab';};
+  const stopDrag=()=>{dragging=false;canvas.style.cursor='grab';};
   canvas.addEventListener('pointerup',stopDrag);
   canvas.addEventListener('pointercancel',stopDrag);
   canvas.style.cursor='grab';
@@ -177,20 +182,6 @@
   function glowDot(x,y,r,color,alpha=1,blur=8){
     ctx.globalAlpha=alpha; ctx.shadowColor=color; ctx.shadowBlur=blur; ctx.fillStyle=color;
     ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
-  }
-  function drawGift(x,base,width,height,color,ribbon,time,hovered=false){
-    ctx.save();
-    ctx.globalAlpha=.55;ctx.fillStyle='#04101c';ctx.beginPath();ctx.ellipse(x+width*.5,base+height*.035,width*.68,height*.15,0,0,Math.PI*2);ctx.fill();
-    const face=ctx.createLinearGradient(x,base-height,x+width,base);face.addColorStop(0,color);face.addColorStop(1,'#142c48');
-    ctx.globalAlpha=1;ctx.fillStyle=face;ctx.shadowColor=hovered?'#9cddff':'transparent';ctx.shadowBlur=hovered?25:0;ctx.fillRect(x,base-height,width,height);ctx.shadowBlur=0;
-    ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(x,base-height,width,Math.max(2,height*.08));
-    ctx.fillStyle=ribbon;ctx.fillRect(x+width*.43,base-height,width*.14,height);ctx.fillRect(x,base-height*.25,width,height*.12);
-    ctx.strokeStyle=ribbon;ctx.lineWidth=Math.max(1.3,width*.055);ctx.beginPath();
-    ctx.ellipse(x+width*.4,base-height*1.05,width*.17,height*.12,-.45,0,Math.PI*2);
-    ctx.ellipse(x+width*.6,base-height*1.05,width*.17,height*.12,.45,0,Math.PI*2);ctx.stroke();
-    ctx.fillStyle='#fff2cc';ctx.shadowColor=ribbon;ctx.shadowBlur=10;ctx.beginPath();ctx.arc(x+width*.5,base-height*.98,width*.045,0,Math.PI*2);ctx.fill();
-    if(hovered){ctx.globalAlpha=.82;ctx.shadowBlur=0;ctx.strokeStyle='#b9e8ff';ctx.lineWidth=1.4;ctx.strokeRect(x-2,base-height-2,width+4,height+4);}
-    ctx.restore();
   }
   function drawForegroundSnow(time){
     for(const f of frontSnow){
@@ -214,13 +205,13 @@
     const burst=Math.exp(-Math.pow((time-240)/680,2));
     ctx.save();ctx.globalCompositeOperation='lighter';
     const flash=ctx.createRadialGradient(cx,cy-scale*.35,0,cx,cy-scale*.35,scale*4.2);
-    flash.addColorStop(0,`rgba(255,232,170,${.5*burst})`);flash.addColorStop(.24,`rgba(255,178,58,${.29*burst})`);flash.addColorStop(1,'rgba(0,0,0,0)');
+    flash.addColorStop(0,`rgba(255,223,239,${.58*burst})`);flash.addColorStop(.24,`rgba(255,112,177,${.34*burst})`);flash.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=flash;ctx.fillRect(cx-scale*4.5,cy-scale*4.7,scale*9,scale*9);
     // Champagne-gold rays flare out as the particles gather.
     ctx.translate(cx,cy-scale*.28);ctx.rotate(time*.00016);ctx.lineCap='round';
     for(let i=0;i<40;i++){
       const a=i*Math.PI*2/40, inner=scale*(.22+(.5+.5*Math.sin(i*4.7))* .28), outer=scale*(2.4+(.5+.5*Math.sin(i*2.3))*2.0);
-      ctx.globalAlpha=burst*(i%4===0?.48:.25);ctx.strokeStyle=i%4===0?'#fff3c8':'#ffc85f';ctx.shadowColor='#ffbe45';ctx.shadowBlur=26;ctx.lineWidth=i%4===0?1.9:1.05;
+      ctx.globalAlpha=burst*(i%4===0?.55:.3);ctx.strokeStyle=i%4===0?'#fff7fc':'#ff9dc8';ctx.shadowColor='#ff65a8';ctx.shadowBlur=28;ctx.lineWidth=i%4===0?2:1.1;
       ctx.beginPath();ctx.moveTo(Math.cos(a)*inner,Math.sin(a)*inner);ctx.lineTo(Math.cos(a)*outer,Math.sin(a)*outer);ctx.stroke();
     }
     ctx.restore();
@@ -229,18 +220,18 @@
     for(let ring=0;ring<4;ring++){
       const age=Math.max(0,time-ring*340), progress=Math.min(1,age/2100);
       if(progress>=1)continue;
-      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=(1-progress)*(.64-ring*.09);ctx.strokeStyle=ring===0?'#fff0bd':'#f2b944';ctx.shadowColor='#ffc95c';ctx.shadowBlur=30;ctx.lineWidth=3.2-progress*2.1;
+      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=(1-progress)*(.68-ring*.09);ctx.strokeStyle=ring%2===0?'#fff2f8':'#ff82b8';ctx.shadowColor='#ff6eae';ctx.shadowBlur=30;ctx.lineWidth=3.2-progress*2.1;
       ctx.beginPath();ctx.ellipse(cx,groundY,scale*(.3+progress*2.55),scale*(.045+progress*.12),0,0,Math.PI*2);ctx.stroke();ctx.restore();
     }
     // A glowing sweep travels up the trunk while the tree forms from the base.
     const rise=Math.min(1,time/4900), sweepY=groundY-rise*scale*5.75, sweepR=scale*(.22+(1-rise)*1.7);
-    ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=(1-rise*.72)*fade;ctx.strokeStyle='#fff0bf';ctx.shadowColor='#ffd15c';ctx.shadowBlur=34;ctx.lineWidth=3;
+    ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=(1-rise*.72)*fade;ctx.strokeStyle='#fff3fa';ctx.shadowColor='#ff72ae';ctx.shadowBlur=34;ctx.lineWidth=3;
     ctx.beginPath();ctx.ellipse(cx,sweepY,sweepR,sweepR*.12,0,0,Math.PI*2);ctx.stroke();ctx.restore();
     // A wider, brighter spiral of sparks flies outward during the reveal.
     for(let i=0;i<148;i++){
       const age=time-i*15;if(age<0||age>2600)continue;
       const p=age/2600, angle=i*2.399963+age*.0025, distance=scale*(.35+p*4.2), alpha=(1-p)*fade*.95;
-      glowDot(cx+Math.cos(angle)*distance,cy-scale*.25+Math.sin(angle)*distance*.78,1.5+(i%4)*.48,i%5===0?'#fff9e7':'#ffd16b',alpha,17);
+      glowDot(cx+Math.cos(angle)*distance,cy-scale*.25+Math.sin(angle)*distance*.78,1.5+(i%4)*.48,i%5===0?'#fff9fd':'#ff91bd',alpha,17);
     }
   }
   function drawOrbitTrails(time,cx,cy,scale){
@@ -248,7 +239,7 @@
     for(let i=0;i<3;i++){
       const yLevel=1.15+i*1.28, radius=scale*(.58+(1-yLevel/5.8)*1.65), centerY=cy+(2.85-yLevel)*scale;
       ctx.save();ctx.translate(cx,centerY);ctx.rotate(time*.00023*(i%2?1:-1)+i*.8);ctx.scale(1,.2);
-      ctx.globalAlpha=.22+.12*Math.sin(time*.002+i);ctx.strokeStyle=i===1?'#fff0c1':'#f3bd50';ctx.shadowColor='#ffc94f';ctx.shadowBlur=18;ctx.lineWidth=1.35;
+      ctx.globalAlpha=.27+.12*Math.sin(time*.002+i);ctx.strokeStyle=i===1?'#fff4fb':'#ff8fbe';ctx.shadowColor='#ff74ae';ctx.shadowBlur=18;ctx.lineWidth=1.45;
       ctx.beginPath();ctx.ellipse(0,0,radius,radius*.94,0,.18,Math.PI*1.52);ctx.stroke();ctx.restore();
     }
     ctx.restore();
@@ -283,10 +274,13 @@
       const pop=1+2.3*back*back*back+1.3*back*back;
       const fade=age>4000?(4800-age)/800:1, alpha=raw*fade;
       const caption="Qiuxia's hot pot is so delicious!", fontSize=Math.max(14,Math.min(23,d.size*.16));
-      ctx.save();ctx.font=`italic 600 ${fontSize}px Georgia, 'Times New Roman', serif`;
-      const width=ctx.measureText(caption).width, tx=Math.max(width*.5+16,Math.min(w-width*.5-16,d.x));
-      ctx.translate(tx,d.y-d.size*.61);ctx.scale(pop,pop);ctx.globalAlpha=alpha;
-      ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#eef9ff';ctx.shadowColor='#56baff';ctx.shadowBlur=24;
+      ctx.save();ctx.font=`italic 700 ${fontSize}px Georgia, 'Times New Roman', serif`;
+      const textWidth=ctx.measureText(caption).width, boxWidth=textWidth+30, boxHeight=fontSize*1.9;
+      const tx=Math.max(boxWidth*.5+10,Math.min(w-boxWidth*.5-10,d.x)), ty=d.y-d.size*.68;
+      ctx.translate(tx,ty);ctx.scale(pop,pop);ctx.globalAlpha=alpha;
+      ctx.beginPath();ctx.roundRect(-boxWidth*.5,-boxHeight*.5,boxWidth,boxHeight,boxHeight*.42);
+      ctx.fillStyle='rgba(4,5,12,.96)';ctx.fill();ctx.strokeStyle='rgba(255,224,237,.96)';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fffafd';ctx.shadowBlur=0;
       ctx.fillText(caption,0,0);ctx.restore();
     }
   }
@@ -309,11 +303,14 @@
       for(let k=0;k<6;k++){ctx.rotate(Math.PI/3);ctx.moveTo(0,0);ctx.lineTo(0,-r*1.8);ctx.moveTo(0,-r*1.05);ctx.lineTo(-r*.28,-r*1.3);ctx.moveTo(0,-r*1.05);ctx.lineTo(r*.28,-r*1.3);}
       ctx.stroke();ctx.restore();
     }
-    const compact=w<700, scale=Math.min(h*(compact?.13:.145),w*(compact?.23:.46));
-    const cx=compact?w*.57:w*.68, cy=h*(compact?.62:.57);
+    const compact=w<700, scale=Math.min(h*(compact?.12:.135),w*(compact?.235:.44));
+    const cx=compact?w*.55:w*.68, cy=h*(compact?.49:.48);
+    sceneCx=cx;
+    hotpotButton.style.left=`${cx}px`;
+    hotpotButton.style.top=`${Math.min(h-35,cy+scale*3.36)}px`;
     // Ground halo and a subtle reflection beneath the tree.
     ctx.save();ctx.translate(cx,cy+scale*2.95);ctx.scale(1,.22);
-    const halo=ctx.createRadialGradient(0,0,scale*.1,0,0,scale*2.2);halo.addColorStop(0,'rgba(255,206,102,.34)');halo.addColorStop(.45,'rgba(239,160,48,.16)');halo.addColorStop(1,'rgba(18,46,100,0)');
+    const halo=ctx.createRadialGradient(0,0,scale*.1,0,0,scale*2.2);halo.addColorStop(0,'rgba(255,151,198,.3)');halo.addColorStop(.45,'rgba(151,61,112,.14)');halo.addColorStop(1,'rgba(18,46,100,0)');
     ctx.fillStyle=halo;ctx.beginPath();ctx.arc(0,0,scale*2.2,0,Math.PI*2);ctx.fill();ctx.restore();
     // Draw back-to-front for a convincing volumetric point cloud.
     const sceneReveal=Math.min(1,time/4900);
@@ -322,13 +319,15 @@
     const points=[];
     for(const p of tree){const start=entrancePosition(p,time),q=project(start,time,scale,cx,cy,rotation,tilt);points.push({...q,type:0,p,entranceAlpha:start.alpha});}
     for(const p of garland){const start=entrancePosition(p,time),q=project(start,time,scale,cx,cy,rotation,tilt);points.push({...q,type:1,p,entranceAlpha:start.alpha});}
+    for(const p of trunk){const start=entrancePosition(p,time),q=project(start,time,scale,cx,cy,rotation,tilt);points.push({...q,type:2,p,entranceAlpha:start.alpha});}
     points.sort((a,b)=>a.z-b.z);
     for(const q of points){
       const flicker=.55+.45*Math.sin(time*.002+q.p.phase), size=q.p.size*q.perspective*(q.type?1.08:1);
-      if(q.type){glowDot(q.x,q.y,size,q.p.hue>.5?'#ffd675':'#fff2c7',flicker*.92*q.entranceAlpha,13);}
-      else {const hue=40+q.p.hue*13, light=61+q.p.hue*18;glowDot(q.x,q.y,size,`hsl(${hue} 82% ${light}%)`,(.72+flicker*.26)*q.entranceAlpha,7);}
+      if(q.type===1){glowDot(q.x,q.y,size,q.p.hue>.5?'#fff9fc':'#ffe3f0',flicker*.98*q.entranceAlpha,14);}
+      else if(q.type===2){glowDot(q.x,q.y,size,q.p.hue>.5?'#9b574d':'#d18468',(.82+flicker*.16)*q.entranceAlpha,4);}
+      else {const hue=324+q.p.hue*28, light=52+q.p.hue*20;glowDot(q.x,q.y,size,`hsl(${hue} 91% ${light}%)`,(.78+flicker*.22)*q.entranceAlpha,7);}
     }
-    for(const b of baubles){const q=project(b,time,scale,cx,cy,rotation,tilt), c=b.h?'#ffd16b':'#fff0c4';
+    for(const b of baubles){const q=project(b,time,scale,cx,cy,rotation,tilt), c=b.h?'#ffd66f':'#fff0f7';
       glowDot(q.x,q.y,4.5*q.perspective,c,.98*sceneReveal,19);glowDot(q.x-1,q.y-1,1.3,'#fffaf0',.95*sceneReveal,4);
     }
     for(const s of orbitSparkles){
@@ -337,23 +336,12 @@
       const twinkle=.3+.7*(.5+.5*Math.sin(time*.003+s.phase));
       glowDot(q.x,q.y,s.size*q.perspective,s.color,twinkle*sceneReveal,10);
     }
-    // Small wrapped presents on the snowy ground.
-    const ground=cy+scale*2.92;
-    const gifts=[
-      {x:cx-scale*1.78,base:ground,width:scale*.42,height:scale*.38,color:'#245c9b',ribbon:'#b8e3ff'},
-      {x:cx-scale*1.34,base:ground-scale*.02,width:scale*.32,height:scale*.29,color:'#315f8d',ribbon:'#d7f0ea'},
-      {x:cx+scale*1.38,base:ground,width:scale*.46,height:scale*.41,color:'#2878b6',ribbon:'#c7ecff'}
-    ];
-    giftHitAreas=gifts.map(g=>({x:g.x-scale*.035,y:g.base-g.height-scale*.12,width:g.width+scale*.07,height:g.height+scale*.18}));
-    giftHoverIndex=giftHitAreas.findIndex(a=>pointerX>=a.x&&pointerX<=a.x+a.width&&pointerY>=a.y&&pointerY<=a.y+a.height);
-    if(!dragging)canvas.style.cursor=giftHoverIndex>=0?'pointer':'grab';
-    gifts.forEach((g,i)=>drawGift(g.x,g.base,g.width,g.height,g.color,g.ribbon,time,i===giftHoverIndex));
     // Star topper with long, fine rays.
     const top=project({x:0,y:5.95,z:0},time,scale,cx,cy,rotation,tilt), pulse=.78+.22*Math.sin(time*.003);
     ctx.save();ctx.translate(top.x,top.y);ctx.rotate(time*.00022);
-    ctx.globalAlpha=.96*sceneReveal;ctx.strokeStyle='#fff0bd';ctx.lineWidth=1.7;ctx.shadowColor='#ffc64f';ctx.shadowBlur=34;
+    ctx.globalAlpha=.96*sceneReveal;ctx.strokeStyle='#fff7fc';ctx.lineWidth=1.7;ctx.shadowColor='#ff8fbe';ctx.shadowBlur=34;
     for(let i=0;i<8;i++){ctx.rotate(Math.PI/4);ctx.beginPath();ctx.moveTo(0,-2);ctx.lineTo(0,-14*pulse);ctx.stroke();}
-    ctx.fillStyle='#fff8e6';ctx.beginPath();ctx.arc(0,0,5.7*pulse,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.fillStyle='#fff7fc';ctx.beginPath();ctx.arc(0,0,5.7*pulse,0,Math.PI*2);ctx.fill();ctx.restore();
     ctx.globalAlpha=1;
     drawHotpot(time);
     drawForegroundSnow(time);
